@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMS IB-PYP Digital Portfolio</title>
+    <!-- External Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .tab-btn-active { border-bottom: 3px solid #1e3a8a; color: #1e3a8a; font-weight: 800; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .card { background: white; border-radius: 1.5rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        input[type="radio"] { width: 1.2rem; height: 1.2rem; accent-color: #1e3a8a; cursor: pointer; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="p-4 md:p-8" onload="initApp()">
+
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-900 border-t-transparent mb-4"></div>
+        <p class="text-blue-900 font-black uppercase tracking-widest text-[10px]">Processing Cloud Sync...</p>
+    </div>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="login-screen" class="max-w-md mx-auto mt-10 p-10 card fade-in">
+        <div class="text-center mb-10">
+            <div class="text-5xl mb-4">🏫</div>
+            <h1 class="text-3xl font-black text-blue-900 tracking-tighter uppercase">CMS Portal</h1>
+            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Digital Portfolio System</p>
+        </div>
+
+        <div class="space-y-5">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Access Portal</label>
+                <select id="role-select" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl font-bold text-gray-700 outline-none focus:border-blue-500 transition-all" onchange="toggleLoginUI()">
+                    <option value="student">Student / Parent</option>
+                    <option value="staff">Staff / Faculty</option>
+                </select>
+            </div>
+
+            <div id="student-box">
+                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Portfolio Access ID</label>
+                <input type="text" id="access-code" placeholder="Enter Full Name" class="w-full p-4 bg-gray-50 rounded-2xl text-center font-mono uppercase tracking-wider text-lg border-2 border-transparent focus:border-blue-500 outline-none">
+            </div>
+
+            <div id="staff-box" class="hidden p-4 bg-blue-50 rounded-2xl border border-blue-100 text-center">
+                <p class="text-[10px] text-blue-700 font-black uppercase tracking-widest">Google Workspace Auth Required</p>
+            </div>
+
+            <button onclick="handleLogin()" class="w-full bg-blue-900 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-black transition-all transform active:scale-95">
+                ACCESS SYSTEM
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. STAFF DASHBOARD -->
+    <div id="staff-dashboard" class="hidden max-w-6xl mx-auto fade-in">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 p-6 card gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-xs">CMS</div>
+                <div>
+                    <h2 id="user-display-email" class="font-black text-gray-800 text-sm">---</h2>
+                    <div id="user-roles-container" class="flex gap-1 mt-1"></div>
+                </div>
+            </div>
+            <button onclick="location.reload()" class="bg-red-50 text-red-600 px-6 py-2 rounded-xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all">LOGOUT</button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-4 space-y-6">
+                <div class="p-6 card">
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase mb-6 border-b pb-2">Filter Selection</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase">Subject</label>
+                            <select id="t-subject" class="w-full p-4 border rounded-2xl mt-1 font-bold bg-gray-50 text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase">Student</label>
+                            <select id="t-student" class="w-full p-4 border rounded-2xl mt-1 font-medium text-sm"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8 p-8 card">
+                <div class="flex space-x-8 border-b mb-8 overflow-x-auto no-scrollbar">
+                    <button onclick="switchTab('academic')" id="tab-academic" class="tab-btn-active pb-4 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Academic</button>
+                    <button onclick="switchTab('atl')" id="tab-atl" class="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-300 whitespace-nowrap">ATL Skills</button>
+                </div>
+
+                <div id="tab-content">
+                    <div id="panel-academic" class="tab-panel space-y-6">
+                        <div class="bg-blue-50 p-8 rounded-3xl border border-blue-100 text-center">
+                            <label class="text-[10px] font-black text-blue-400 uppercase mb-4 block">Percentage Score</label>
+                            <div class="flex items-center justify-center gap-4">
+                                <input type="number" id="t-raw" placeholder="0" class="w-24 p-4 text-center text-2xl font-black rounded-2xl border-none outline-none" oninput="updatePct()">
+                                <span class="text-2xl font-black text-blue-200">/</span>
+                                <input type="number" id="t-total" value="20" class="w-24 p-4 text-center text-2xl font-black rounded-2xl border-none outline-none" oninput="updatePct()">
+                            </div>
+                            <div id="pct-display" class="mt-6 text-6xl font-black text-blue-900">0%</div>
+                        </div>
+                        <textarea id="t-note" placeholder="Write feedback or observations..." class="w-full p-6 border-2 border-gray-100 rounded-3xl h-32 text-sm focus:border-blue-200 outline-none transition-all"></textarea>
+                    </div>
+
+                    <div id="panel-atl" class="tab-panel hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="text-gray-400 uppercase font-black">
+                                    <th class="pb-4">ATL Skill</th>
+                                    <th class="text-center pb-4">Beg</th>
+                                    <th class="text-center pb-4">Dev</th>
+                                    <th class="text-center pb-4">Con</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                <tr><td class="py-4 font-bold">Communication</td><td class="text-center"><input type="radio" name="atl-1" value="Beg"></td><td class="text-center"><input type="radio" name="atl-1" value="Dev"></td><td class="text-center"><input type="radio" name="atl-1" value="Con"></td></tr>
+                                <tr><td class="py-4 font-bold">Thinking</td><td class="text-center"><input type="radio" name="atl-2" value="Beg"></td><td class="text-center"><input type="radio" name="atl-2" value="Dev"></td><td class="text-center"><input type="radio" name="atl-2" value="Con"></td></tr>
+                                <tr><td class="py-4 font-bold">Research</td><td class="text-center"><input type="radio" name="atl-3" value="Beg"></td><td class="text-center"><input type="radio" name="atl-3" value="Dev"></td><td class="text-center"><input type="radio" name="atl-3" value="Con"></td></tr>
+                                <tr><td class="py-4 font-bold">Self-Management</td><td class="text-center"><input type="radio" name="atl-4" value="Beg"></td><td class="text-center"><input type="radio" name="atl-4" value="Dev"></td><td class="text-center"><input type="radio" name="atl-4" value="Con"></td></tr>
+                                <tr><td class="py-4 font-bold">Social</td><td class="text-center"><input type="radio" name="atl-5" value="Beg"></td><td class="text-center"><input type="radio" name="atl-5" value="Dev"></td><td class="text-center"><input type="radio" name="atl-5" value="Con"></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <button id="save-btn" onclick="saveData()" class="w-full mt-10 bg-blue-900 text-white py-5 rounded-2xl font-black shadow-xl hover:bg-black transition-all active:scale-95">
+                    SYNC DATA TO PORTFOLIO
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. STUDENT DASHBOARD -->
+    <div id="student-dashboard" class="hidden max-w-4xl mx-auto py-6 fade-in">
+        <div class="text-center mb-10">
+            <h1 id="s-name" class="text-4xl font-black text-blue-900 tracking-tighter">---</h1>
+            <p id="s-id" class="text-[10px] font-black text-gray-400 mt-2 uppercase tracking-[0.3em]">---</p>
+        </div>
+        <div class="p-8 card">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="font-black text-[10px] uppercase tracking-widest text-blue-400">Academic Analytics</h3>
+                <span class="text-[9px] font-bold px-3 py-1 bg-green-50 text-green-600 rounded-full">LIVE DATA</span>
+            </div>
+            <div class="h-64 mb-10">
+                <canvas id="student-chart"></canvas>
+            </div>
+            <div id="logs-list" class="space-y-4"></div>
+        </div>
+    </div>
+
+<script>
+    // Replace with your Web App URL if hosting on GitHub Pages
+    const https://script.google.com/macros/s/AKfycbzhpFMwQGJy5Y930TJnf4p_lTGCWnanXdP3gqg3SvPsBsnwsAMYNQytjuHv2QWMxTCm/exec; 
+
+    let profile = null;
+    let studentRegistry = []
+    let currentTab = 'academic';
+
+    const runGoogleScript = async (methodName, ...args) => {
+        // Works if inside Apps Script iframe
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)[methodName](...args);
+            });
+        } 
+        
+        // Demo fallback for when script context is missing
+        console.warn("No Google Script context. Running in demo mode.");
+        return null;
+    };
+
+    function initApp() { toggleLoginUI(); }
+
+    function toggleLoginUI() {
+        const isStaff = document.getElementById('role-select').value === 'staff';
+        document.getElementById('student-box').classList.toggle('hidden', isStaff);
+        document.getElementById('staff-box').classList.toggle('hidden', !isStaff);
+    }
+
+    function showLoading(show) { document.getElementById('loading').classList.toggle('hidden', !show); }
+
+    async function handleLogin() {
+        const role = document.getElementById('role-select').value;
+        showLoading(true);
+
+        try {
+            const result = await runGoogleScript('getUserProfile');
+            
+            if (role === 'staff') {
+                if (!result) { // Demo fallback
+                    profile = { email: 'teacher@school.edu', roles: ['Staff'], subjects: ['Mathematics'], coordSubjects: [] };
+                } else {
+                    if (result.roles.includes('guest')) { showLoading(false); alert("Access Denied"); return; }
+                    profile = result;
+                }
+                loadStaffDashboard();
+            } else {
+                const code = document.getElementById('access-code').value.trim();
+                const list = await runGoogleScript('getVisibleStudents') || [];
+                const found = list.find(s => s.id.toLowerCase() === code.toLowerCase());
+                
+                if (found) {
+                    loadStudentDashboard(found);
+                } else if (code.toUpperCase() === "DEMO") {
+                    loadStudentDashboard({id: "DEMO-001", name: "Demo Student", grade: "G4"});
+                } else {
+                    showLoading(false); 
+                    alert("ID not found. Use 'DEMO' to see preview.");
+                }
+            }
+        } catch (err) { console.error(err); showLoading(false); }
+    }
+
+    async function loadStaffDashboard() {
+        const list = await runGoogleScript('getVisibleStudents') || [{id: "DEMO-001", name: "Demo Student", grade: "G4"}];
+        studentRegistry = list;
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('staff-dashboard').classList.remove('hidden');
+        document.getElementById('user-display-email').innerText = profile.email;
+        document.getElementById('user-roles-container').innerHTML = profile.roles.map(r => 
+            `<span class="bg-blue-900 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase">${r}</span>`
+        ).join('');
+
+        const subSelect = document.getElementById('t-subject');
+        subSelect.innerHTML = profile.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('t-student').innerHTML = studentRegistry.map(s => 
+            `<option value="${s.id}">${s.name} [${s.grade}]</option>`
+        ).join('');
+        showLoading(false);
+    }
+
+    async function loadStudentDashboard(student) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('student-dashboard').classList.remove('hidden');
+        document.getElementById('s-name').innerText = student.name;
+        document.getElementById('s-id').innerText = student.id;
+
+        const logs = await runGoogleScript('getStudentData', student.id) || [
+            {subject: "Math", value: "85%", note: "Excellent work on fractions", date: new Date()}
+        ];
+        renderChart(logs);
+        document.getElementById('logs-list').innerHTML = logs.map(l => `
+            <div class="p-6 bg-gray-50 rounded-2xl flex justify-between items-center border border-gray-100">
+                <div>
+                    <p class="text-[9px] font-black text-blue-600 uppercase">${l.subject}</p>
+                    <p class="text-sm font-bold text-gray-800 mt-1">${l.note}</p>
+                </div>
+                <div class="text-3xl font-black text-blue-900">${l.value}</div>
+            </div>
+        `).join('');
+        showLoading(false);
+    }
+
+    function updatePct() {
+        const r = parseFloat(document.getElementById('t-raw').value) || 0;
+        const t = parseFloat(document.getElementById('t-total').value) || 1;
+        document.getElementById('pct-display').innerText = Math.round((r/t)*100) + "%";
+    }
+
+    function switchTab(t) {
+        currentTab = t;
+        document.querySelectorAll('.tab-btn-active').forEach(b => b.classList.remove('tab-btn-active'));
+        document.getElementById('tab-' + t).classList.add('tab-btn-active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('panel-' + t).classList.remove('hidden');
+    }
+
+    async function saveData() {
+        const studentId = document.getElementById('t-student').value;
+        const payload = {
+            studentId: studentId,
+            subject: document.getElementById('t-subject').value,
+            val: document.getElementById('pct-display').innerText,
+            note: document.getElementById('t-note').value
+        };
+        showLoading(true);
+        const res = await runGoogleScript('saveEntry', payload);
+        showLoading(false);
+        alert(res || "Sync request processed.");
+    }
+
+    function renderChart(logs) {
+        const ctx = document.getElementById('student-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: logs.map(l => new Date(l.date).toLocaleDateString()),
+                datasets: [{ data: logs.map(l => parseInt(l.value)), borderColor: '#1e3a8a', tension: 0.3 }]
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+</script>
+</body>
+</html>
