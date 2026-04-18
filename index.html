@@ -157,15 +157,18 @@
     </div>
 
 <script>
-    // Replace with your Web App URL if hosting on GitHub Pages
-    const https://script.google.com/macros/s/AKfycbzhpFMwQGJy5Y930TJnf4p_lTGCWnanXdP3gqg3SvPsBsnwsAMYNQytjuHv2QWMxTCm/exec; 
+    /**
+     * CONFIGURATION
+     * The URL below is your deployed Google Apps Script Web App.
+     */
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzhpFMwQGJy5Y930TJnf4p_lTGCWnanXdP3gqg3SvPsBsnwsAMYNQytjuHv2QWMxTCm/exec"; 
 
     let profile = null;
-    let studentRegistry = []
+    let studentRegistry = [];
     let currentTab = 'academic';
 
     const runGoogleScript = async (methodName, ...args) => {
-        // Works if inside Apps Script iframe
+        // Mode 1: Inside Google Apps Script Environment
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             return new Promise((resolve, reject) => {
                 google.script.run
@@ -174,9 +177,28 @@
             });
         } 
         
-        // Demo fallback for when script context is missing
-        console.warn("No Google Script context. Running in demo mode.");
-        return null;
+        // Mode 2: External Hosting (GitHub) via fetch
+        if (!WEB_APP_URL) {
+            console.warn("External context: WEB_APP_URL is not configured.");
+            return null;
+        }
+
+        try {
+            // Using a GET request for data retrieval via the doGet(e) wrapper
+            const url = `${WEB_APP_URL}?method=${methodName}&args=${encodeURIComponent(JSON.stringify(args))}`;
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                return result.data;
+            } else {
+                console.error("Server Error:", result.message);
+                return null;
+            }
+        } catch (err) {
+            console.error("Network/CORS Error:", err);
+            return null;
+        }
     };
 
     function initApp() { toggleLoginUI(); }
@@ -197,10 +219,11 @@
             const result = await runGoogleScript('getUserProfile');
             
             if (role === 'staff') {
-                if (!result) { // Demo fallback
+                if (!result) { 
+                    // Fallback for demo when script fails/CORS issues
                     profile = { email: 'teacher@school.edu', roles: ['Staff'], subjects: ['Mathematics'], coordSubjects: [] };
                 } else {
-                    if (result.roles.includes('guest')) { showLoading(false); alert("Access Denied"); return; }
+                    if (result.roles.includes('guest')) { showLoading(false); alert("Access Denied: You are not in the Staff sheet."); return; }
                     profile = result;
                 }
                 loadStaffDashboard();
@@ -215,14 +238,14 @@
                     loadStudentDashboard({id: "DEMO-001", name: "Demo Student", grade: "G4"});
                 } else {
                     showLoading(false); 
-                    alert("ID not found. Use 'DEMO' to see preview.");
+                    alert("ID not found. Ensure the name matches exactly what is on the spreadsheet.");
                 }
             }
         } catch (err) { console.error(err); showLoading(false); }
     }
 
     async function loadStaffDashboard() {
-        const list = await runGoogleScript('getVisibleStudents') || [{id: "DEMO-001", name: "Demo Student", grade: "G4"}];
+        const list = await runGoogleScript('getVisibleStudents') || [];
         studentRegistry = list;
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('staff-dashboard').classList.remove('hidden');
@@ -245,19 +268,18 @@
         document.getElementById('s-name').innerText = student.name;
         document.getElementById('s-id').innerText = student.id;
 
-        const logs = await runGoogleScript('getStudentData', student.id) || [
-            {subject: "Math", value: "85%", note: "Excellent work on fractions", date: new Date()}
-        ];
+        const logs = await runGoogleScript('getStudentData', student.id) || [];
         renderChart(logs);
-        document.getElementById('logs-list').innerHTML = logs.map(l => `
+        document.getElementById('logs-list').innerHTML = logs.length ? logs.map(l => `
             <div class="p-6 bg-gray-50 rounded-2xl flex justify-between items-center border border-gray-100">
                 <div>
                     <p class="text-[9px] font-black text-blue-600 uppercase">${l.subject}</p>
                     <p class="text-sm font-bold text-gray-800 mt-1">${l.note}</p>
+                    <p class="text-[8px] text-gray-400 mt-1 uppercase font-bold">${new Date(l.date).toLocaleDateString()}</p>
                 </div>
                 <div class="text-3xl font-black text-blue-900">${l.value}</div>
             </div>
-        `).join('');
+        `).join('') : '<p class="text-center text-gray-400 py-10 font-bold">No portfolio entries found.</p>';
         showLoading(false);
     }
 
@@ -277,27 +299,50 @@
 
     async function saveData() {
         const studentId = document.getElementById('t-student').value;
+        const student = studentRegistry.find(s => s.id === studentId);
+        
         const payload = {
             studentId: studentId,
+            grade: student ? student.grade : "Unknown",
             subject: document.getElementById('t-subject').value,
             val: document.getElementById('pct-display').innerText,
             note: document.getElementById('t-note').value
         };
+        
         showLoading(true);
         const res = await runGoogleScript('saveEntry', payload);
         showLoading(false);
-        alert(res || "Sync request processed.");
+        if (res === "Success") {
+            alert("Success! Portfolio updated.");
+            document.getElementById('t-raw').value = "";
+            document.getElementById('t-note').value = "";
+            updatePct();
+        } else {
+            alert("Entry submitted to cloud.");
+        }
     }
 
     function renderChart(logs) {
         const ctx = document.getElementById('student-chart').getContext('2d');
+        const numericLogs = logs.filter(l => l.value.includes('%')).sort((a,b) => new Date(a.date) - new Date(b.date));
+        
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: logs.map(l => new Date(l.date).toLocaleDateString()),
-                datasets: [{ data: logs.map(l => parseInt(l.value)), borderColor: '#1e3a8a', tension: 0.3 }]
+                labels: numericLogs.map(l => new Date(l.date).toLocaleDateString()),
+                datasets: [{ 
+                    data: numericLogs.map(l => parseInt(l.value)), 
+                    borderColor: '#1e3a8a', 
+                    backgroundColor: 'rgba(30,58,138,0.1)',
+                    fill: true,
+                    tension: 0.3 
+                }]
             },
-            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            options: { 
+                maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
+                scales: { y: { min: 0, max: 100 } }
+            }
         });
     }
 </script>
